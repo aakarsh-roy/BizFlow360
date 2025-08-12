@@ -139,15 +139,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadUser = async () => {
       const token = localStorage.getItem('token');
+      console.log('🔍 Initial load - checking token:', token);
+      
       if (token) {
         try {
+          console.log('🔄 Loading user from token...');
           const response = await api.get('/auth/me');
+          console.log('✅ User loaded successfully:', response.data.user);
           dispatch({ type: 'LOAD_USER_SUCCESS', payload: response.data.user });
         } catch (error) {
+          console.error('❌ Failed to load user:', error);
           localStorage.removeItem('token');
           dispatch({ type: 'LOAD_USER_FAILURE' });
         }
       } else {
+        console.log('ℹ️ No token found, user not logged in');
         dispatch({ type: 'LOAD_USER_FAILURE' });
       }
     };
@@ -166,10 +172,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('✅ Extracted user:', user);
       console.log('✅ Extracted token:', token);
 
+      // Store token in localStorage first
       localStorage.setItem('token', token);
+      console.log('✅ Token stored in localStorage');
 
+      // Update state
       dispatch({ type: 'LOGIN_SUCCESS', payload: { user, token } });
-      console.log('✅ Login successful - user logged in');
+      console.log('✅ Login successful - state updated');
+      
+      // Log current auth state
+      console.log('🔍 Current localStorage token:', localStorage.getItem('token'));
+      
     } catch (error: any) {
       console.error('❌ Login error:', error);
       console.error('❌ Error response:', error.response?.data);
