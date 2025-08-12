@@ -3,10 +3,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, AppBar, Toolbar, Typography, Button } from '@mui/material';
 
 import Login from './pages/Login';
-import ERPDashboard from './pages/ERPDashboard';
-import ProductManagement from './pages/ProductManagement';
-import SupplierManagement from './pages/SupplierManagement';
-import CustomerManagement from './pages/CustomerManagement';
+import BPADashboard from './pages/BPADashboard';
+import WorkflowBuilder from './pages/WorkflowBuilder';
+import TaskInbox from './pages/TaskInbox';
+import KPIDashboard from './pages/KPIDashboard';
+import ProcessMonitor from './pages/ProcessMonitor';
+import UserManagement from './pages/UserManagement';
+import CompanySettings from './pages/CompanySettings';
 import PrivateRoute from './components/PrivateRoute';
 import { useAuth } from './contexts/AuthContext';
 
@@ -34,10 +37,10 @@ const App: React.FC = () => {
   return (
     <>
       {user && (
-        <AppBar position="static">
+        <AppBar position="static" sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
           <Toolbar>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              BizFlow360 ERP - Enterprise Resource Planning
+              BizFlow360 BPA - Business Process Automation & KPI Platform
             </Typography>
             <Typography sx={{ mr: 2 }}>
               {user.name} ({user.role}) - {user.department}
@@ -61,31 +64,55 @@ const App: React.FC = () => {
           path="/dashboard"
           element={
             <PrivateRoute>
-              <ERPDashboard />
+              <BPADashboard />
             </PrivateRoute>
           }
         />
         <Route
-          path="/products"
+          path="/workflow-builder"
           element={
             <PrivateRoute>
-              <ProductManagement />
+              <WorkflowBuilder />
             </PrivateRoute>
           }
         />
         <Route
-          path="/suppliers"
+          path="/task-inbox"
           element={
             <PrivateRoute>
-              <SupplierManagement />
+              <TaskInbox />
             </PrivateRoute>
           }
         />
         <Route
-          path="/customers"
+          path="/kpi-dashboard"
           element={
             <PrivateRoute>
-              <CustomerManagement />
+              <KPIDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/process-monitor"
+          element={
+            <PrivateRoute>
+              <ProcessMonitor />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <PrivateRoute>
+              <UserManagement />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <PrivateRoute>
+              <CompanySettings />
             </PrivateRoute>
           }
         />
