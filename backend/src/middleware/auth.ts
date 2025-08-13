@@ -10,26 +10,44 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
   try {
     let token;
 
+    console.log(`🔒 Auth middleware - Headers:`, req.headers.authorization ? 'Present' : 'Missing');
+
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+      console.log(`🎫 Token extracted: ${token ? 'Present' : 'Missing'}`);
     }
 
     if (!token) {
+      console.log(`❌ No token provided for ${req.method} ${req.path}`);
       return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
     }
 
     try {
       const secret = process.env.JWT_SECRET;
       if (!secret) {
+        console.log(`❌ JWT_SECRET not defined in environment`);
         throw new Error('JWT_SECRET is not defined');
       }
+      
+      console.log(`🔍 Verifying token...`);
       const decoded = jwt.verify(token, secret) as any;
-      req.user = await User.findById(decoded.userId);
+      console.log(`✅ Token verified, userId: ${decoded.userId}`);
+      
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        console.log(`❌ User not found for userId: ${decoded.userId}`);
+        return res.status(401).json({ success: false, message: 'User not found' });
+      }
+      
+      console.log(`👤 User authenticated: ${user.name} (${user.email})`);
+      req.user = user;
       next();
-    } catch (error) {
+    } catch (error: any) {
+      console.log(`❌ Token verification failed:`, error.message);
       return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
     }
-  } catch (error) {
+  } catch (error: any) {
+    console.log(`❌ Auth middleware error:`, error.message);
     next(error);
   }
 };

@@ -23,8 +23,11 @@ router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role, department } = req.body;
 
+    // Trim and lowercase email
+    const trimmedEmail = email?.trim().toLowerCase();
+
     // Check if user exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: trimmedEmail });
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -35,7 +38,7 @@ router.post('/register', async (req, res) => {
     // Create user
     const user = await User.create({
       name,
-      email,
+      email: trimmedEmail,
       password,
       role,
       department
@@ -68,9 +71,15 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    // Trim whitespace from email
+    const trimmedEmail = email?.trim().toLowerCase();
+    
+    console.log(`🔐 Login attempt for email: ${email} (trimmed: ${trimmedEmail})`);
 
     // Validate email & password
-    if (!email || !password) {
+    if (!trimmedEmail || !password) {
+      console.log(`❌ Login failed: Missing email or password`);
       return res.status(400).json({
         success: false,
         message: 'Please provide an email and password'
@@ -78,24 +87,31 @@ router.post('/login', async (req, res) => {
     }
 
     // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    console.log(`🔍 Looking up user: ${trimmedEmail}`);
+    const user = await User.findOne({ email: trimmedEmail }).select('+password');
     if (!user) {
+      console.log(`❌ Login failed: User not found for email: ${trimmedEmail}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
+
+    console.log(`👤 User found: ${user.name} (${user.email}) - Role: ${user.role}`);
 
     // Check if password matches
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.log(`❌ Login failed: Invalid password for ${trimmedEmail}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
 
+    console.log(`✅ Password verified for ${email}`);
     const token = generateToken(user._id.toString());
+    console.log(`🎫 JWT token generated for user: ${user._id}`);
 
     res.json({
       success: true,
@@ -108,7 +124,10 @@ router.post('/login', async (req, res) => {
         department: user.department
       }
     });
-  } catch (error) {
+    
+    console.log(`✅ Login successful for ${email} - Token sent`);
+  } catch (error: any) {
+    console.error(`❌ Login error:`, error.message);
     res.status(500).json({
       success: false,
       message: 'Server error'

@@ -1,12 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-
 import connectDB from './config/database';
 import authRoutes from './routes/auth';
-import operationsRoutes from './routes/operations';
-import productRoutes from './modules/inventory/routes/productRoutes';
-import { errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
 
@@ -40,54 +36,57 @@ app.use((req, res, next) => {
   next();
 });
 
-// API Routes
+// API Routes - only auth for now
 app.use('/api/auth', authRoutes);
-app.use('/api/operations', operationsRoutes);
-app.use('/api/inventory/products', productRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   console.log('🏥 Health check requested');
   res.json({ 
     status: 'OK', 
-    service: 'BizFlow360 - Business Process Automation & KPI Platform',
-    modules: [
-      'Authentication & Authorization',
-      'Business Process Automation',
-      'Task Management',
-      'Workflow Engine',
-      'KPI Analytics',
-      'Stock Management',
-      'Sales Operations',
-      'Audit & Compliance',
-      'Real-time Notifications'
-    ],
-    database: 'MongoDB - All operations stored',
+    service: 'BizFlow360 - Minimal Auth Server',
     timestamp: new Date().toISOString() 
   });
 });
 
-// Error handling middleware
-app.use(errorHandler);
+// Manifest.json for PWA
+app.get('/manifest.json', (req, res) => {
+  console.log('📱 Manifest.json requested');
+  res.json({
+    short_name: "BizFlow360",
+    name: "BizFlow360 Business Process Automation",
+    icons: [
+      {
+        src: "favicon.ico",
+        sizes: "64x64 32x32 24x24 16x16",
+        type: "image/x-icon"
+      }
+    ],
+    start_url: ".",
+    display: "standalone",
+    theme_color: "#000000",
+    background_color: "#ffffff"
+  });
+});
+
+// Simple error handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('❌ Server Error:', err.message);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error'
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 BizFlow360 BPA Platform Server running on port ${PORT}`);
+  console.log(`🚀 BizFlow360 Minimal Auth Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`💾 Database: MongoDB - All operations stored`);
-  console.log(`📦 Modules: BPA, Workflows, Tasks, Analytics, Operations`);
+  console.log(`💾 Database: MongoDB Connected`);
   console.log(`🔧 API Endpoints:`);
   console.log(`   - /api/auth/login - User authentication`);
   console.log(`   - /api/auth/register - User registration`);
-  console.log(`   - /api/operations/stock/movement - Stock updates`);
-  console.log(`   - /api/operations/tasks - Task management`);
-  console.log(`   - /api/operations/sales - Sales transactions`);
-  console.log(`   - /api/operations/kpi - KPI metrics`);
-  console.log(`   - /api/operations/workflow/step - Process steps`);
-  console.log(`   - /api/operations/history - Audit trail`);
-  console.log(`   - /api/operations/metrics - Real-time metrics`);
-  console.log(`✅ All business operations are being stored in MongoDB`);
-  console.log(`📝 Audit logging is active for compliance tracking`);
+  console.log(`   - /api/health - Health check`);
   console.log(`🔍 Request logging is enabled`);
 });
