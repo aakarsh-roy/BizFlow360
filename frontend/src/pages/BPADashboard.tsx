@@ -135,6 +135,14 @@ const BPADashboard: React.FC = () => {
       path: '/process-monitor'
     },
     {
+      id: 'inventory',
+      title: 'Inventory Management',
+      description: 'Manage products, track stock levels, and monitor inventory health',
+      icon: <Assignment />,
+      color: 'primary',
+      path: '/inventory'
+    },
+    {
       id: 'automation-hub',
       title: 'Automation Hub',
       description: 'Pre-built automation templates and integrations',

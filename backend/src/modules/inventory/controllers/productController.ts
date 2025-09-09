@@ -91,16 +91,40 @@ export const getProduct = async (req: Request, res: Response) => {
 // @access  Private (Admin/Manager)
 export const createProduct = async (req: AuthRequest, res: Response) => {
   try {
-    const productData = {
-      ...req.body,
-      createdBy: req.user.id,
-      updatedBy: req.user.id
+    // Map frontend fields to backend schema
+    const productData: any = {
+      name: req.body.name,
+      sku: req.body.sku,
+      description: req.body.description,
+      category: req.body.category,
+      brand: req.body.brand,
+      unit: req.body.unit === 'piece' ? 'pieces' : req.body.unit,
+      unitPrice: req.body.sellingPrice,
+      costPrice: req.body.costPrice,
+      stockQuantity: req.body.currentStock || 0,
+      minStockLevel: req.body.reorderPoint || 10,
+      maxStockLevel: req.body.maxStock || 1000,
+      reorderPoint: req.body.reorderPoint || 10,
+      isActive: req.body.status === 'active',
+      createdBy: req.user._id,
+      updatedBy: req.user._id
     };
+
+    // Only add supplier and warehouse if they are valid ObjectIds
+    if (req.body.supplier && req.body.supplier.trim() !== '') {
+      productData.supplier = req.body.supplier;
+    }
+    
+    if (req.body.warehouse && req.body.warehouse.trim() !== '') {
+      productData.warehouse = req.body.warehouse;
+    }
+
+    console.log('📦 Creating product with data:', JSON.stringify(productData, null, 2));
 
     const product = await Product.create(productData);
     
-    // Create initial stock movement record
-    if (product.stockQuantity > 0) {
+    // Create initial stock movement record only if warehouse is provided
+    if (product.stockQuantity > 0 && product.warehouse) {
       await StockMovement.create({
         product: product._id,
         warehouse: product.warehouse,
@@ -110,7 +134,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
         totalValue: product.stockQuantity * product.costPrice,
         referenceType: 'adjustment',
         reason: 'Initial stock entry',
-        performedBy: req.user.id,
+        performedBy: req.user._id,
         isApproved: true,
         stockBefore: 0,
         stockAfter: product.stockQuantity
@@ -123,7 +147,16 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
 
     res.status(201).json({ success: true, data: populatedProduct });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    console.error('❌ Error creating product:', error);
+    console.error('❌ Error details:', error.message);
+    if (error.errors) {
+      console.error('❌ Validation errors:', error.errors);
+    }
+    res.status(400).json({ 
+      success: false, 
+      message: error.message,
+      errors: error.errors
+    });
   }
 };
 
@@ -138,10 +171,34 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
-    const updatedData = {
-      ...req.body,
-      updatedBy: req.user.id
+    // Map frontend fields to backend schema, similar to create
+    const updatedData: any = {
+      name: req.body.name,
+      sku: req.body.sku,
+      description: req.body.description,
+      category: req.body.category,
+      brand: req.body.brand,
+      unit: req.body.unit === 'piece' ? 'pieces' : req.body.unit,
+      unitPrice: req.body.sellingPrice,
+      costPrice: req.body.costPrice,
+      stockQuantity: req.body.currentStock || 0,
+      minStockLevel: req.body.reorderPoint || 10,
+      maxStockLevel: req.body.maxStock || 1000,
+      reorderPoint: req.body.reorderPoint || 10,
+      isActive: req.body.status === 'active',
+      updatedBy: req.user._id
     };
+
+    // Only add supplier and warehouse if they are valid ObjectIds
+    if (req.body.supplier && req.body.supplier.trim() !== '') {
+      updatedData.supplier = req.body.supplier;
+    }
+    
+    if (req.body.warehouse && req.body.warehouse.trim() !== '') {
+      updatedData.warehouse = req.body.warehouse;
+    }
+
+    console.log('📦 Updating product with data:', JSON.stringify(updatedData, null, 2));
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
@@ -150,9 +207,29 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
     ).populate('supplier', 'name companyName')
      .populate('warehouse', 'name location');
 
-    res.json({ success: true, data: updatedProduct });
+    if (!updatedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Product updated successfully',
+      data: updatedProduct 
+    });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    console.error('❌ Error updating product:', error);
+    console.error('❌ Error details:', error.message);
+    if (error.errors) {
+      console.error('❌ Validation errors:', error.errors);
+    }
+    res.status(400).json({ 
+      success: false, 
+      message: error.message,
+      errors: error.errors
+    });
   }
 };
 
@@ -233,7 +310,7 @@ export const updateStock = async (req: AuthRequest, res: Response) => {
       totalValue: Math.abs(quantity) * (unitCost || product.costPrice),
       referenceType: 'adjustment',
       reason: reason || 'Manual stock adjustment',
-      performedBy: req.user.id,
+      performedBy: req.user._id,
       isApproved: true,
       stockBefore,
       stockAfter

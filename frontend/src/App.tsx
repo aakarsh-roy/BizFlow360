@@ -10,6 +10,7 @@ import KPIDashboard from './pages/KPIDashboard';
 import ProcessMonitor from './pages/ProcessMonitor';
 import UserManagement from './pages/UserManagement';
 import CompanySettings from './pages/CompanySettings';
+import InventoryManagement from './pages/InventoryManagement';
 import PrivateRoute from './components/PrivateRoute';
 import { useAuth } from './contexts/AuthContext';
 
@@ -113,6 +114,14 @@ const App: React.FC = () => {
           element={
             <PrivateRoute>
               <CompanySettings />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/inventory"
+          element={
+            <PrivateRoute>
+              <InventoryManagement />
             </PrivateRoute>
           }
         />

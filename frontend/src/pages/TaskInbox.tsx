@@ -1,895 +1,650 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Grid,
   Typography,
-  Paper,
+  Grid,
   Card,
   CardContent,
   Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
   IconButton,
-  Chip,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Divider,
-  TextField,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Tab,
-  Tabs,
-  Badge,
-  Alert,
-  LinearProgress,
-  Tooltip,
-  Menu,
+  TextField,
   MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
-  OutlinedInput,
-  InputAdornment
+  Chip,
+  Avatar,
+  LinearProgress,
+  FormControlLabel,
+  Switch,
+  Alert,
+  CircularProgress,
+  Snackbar,
+  Tabs,
+  Tab,
+  Badge
 } from '@mui/material';
 import {
-  Assignment,
-  CheckCircle,
-  Schedule,
-  PriorityHigh,
-  Person,
-  Comment,
-  AttachFile,
-  MoreVert,
-  FilterList,
-  Search,
-  Refresh,
-  PlayArrow,
-  Pause,
-  Done,
-  Close,
-  Warning,
-  Info,
-  TrendingUp
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Assignment as TaskIcon,
+  CheckCircle as CompleteIcon,
+  Schedule as PendingIcon,
+  PlayArrow as InProgressIcon,
+  PriorityHigh as HighPriorityIcon,
+  Person as AssignIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../utils/api';
 
-// Task interfaces
 interface Task {
   _id: string;
-  title: string;
+  taskName: string;
   description: string;
-  processName: string;
-  processId: string;
-  assignee: string;
-  assigneeRole: string;
+  status: 'pending' | 'in-progress' | 'completed' | 'on-hold';
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'in_progress' | 'completed' | 'rejected' | 'escalated';
-  type: 'approval' | 'review' | 'data_entry' | 'decision' | 'verification';
-  dueDate: Date;
-  createdDate: Date;
-  completedDate?: Date;
-  estimatedDuration: number; // in minutes
-  actualDuration?: number;
-  requiredApprovals?: number;
-  currentApprovals?: number;
-  attachments: TaskAttachment[];
-  comments: TaskComment[];
-  formData?: any;
-  escalationLevel: number;
+  assignedTo: {
+    _id: string;
+    name: string;
+    email: string;
+  } | null;
+  assignedBy: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  dueDate: string;
+  category: string;
+  progress: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface TaskAttachment {
-  id: string;
+interface TaskFormData {
+  taskName: string;
+  description: string;
+  status: 'pending' | 'in-progress' | 'completed' | 'on-hold';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assignedTo: string;
+  dueDate: string;
+  category: string;
+  progress: number;
+}
+
+interface User {
+  _id: string;
   name: string;
-  url: string;
-  type: string;
-  size: number;
-  uploadedBy: string;
-  uploadedAt: Date;
+  email: string;
 }
-
-interface TaskComment {
-  id: string;
-  userId: string;
-  userName: string;
-  comment: string;
-  timestamp: Date;
-  type: 'comment' | 'approval' | 'rejection' | 'escalation';
-}
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
-  return (
-    <div hidden={value !== index}>
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
-    </div>
-  );
-};
 
 const TaskInbox: React.FC = () => {
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [tabValue, setTabValue] = useState(0);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [taskDetailOpen, setTaskDetailOpen] = useState(false);
-  const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [comment, setComment] = useState('');
+  const [formData, setFormData] = useState<TaskFormData>({
+    taskName: '',
+    description: '',
+    status: 'pending',
+    priority: 'medium',
+    assignedTo: '',
+    dueDate: '',
+    category: '',
+    progress: 0
+  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  const statuses = ['pending', 'in-progress', 'completed', 'on-hold'];
+  const priorities = ['low', 'medium', 'high', 'urgent'];
+  const categories = ['Development', 'Design', 'Testing', 'Documentation', 'Management', 'Support', 'Other'];
 
   useEffect(() => {
     fetchTasks();
-  }, [user]);
+    fetchUsers();
+  }, []);
 
   const fetchTasks = async () => {
-    setLoading(true);
     try {
-      // Simulate API call with realistic task data
-      setTimeout(() => {
-        const mockTasks: Task[] = [
-          {
-            _id: '1',
-            title: 'Approve Invoice #INV-2024-0156',
-            description: 'Review and approve invoice for office supplies purchase. Amount: $2,450.00',
-            processName: 'Invoice Approval Process',
-            processId: 'proc_001',
-            assignee: user?.name || 'Current User',
-            assigneeRole: user?.role || 'manager',
-            priority: 'high',
-            status: 'pending',
-            type: 'approval',
-            dueDate: new Date(Date.now() + 4 * 60 * 60 * 1000), // 4 hours from now
-            createdDate: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            estimatedDuration: 15,
-            requiredApprovals: 1,
-            currentApprovals: 0,
-            attachments: [
-              {
-                id: 'att1',
-                name: 'invoice_INV-2024-0156.pdf',
-                url: '#',
-                type: 'application/pdf',
-                size: 245760,
-                uploadedBy: 'Finance Team',
-                uploadedAt: new Date()
-              }
-            ],
-            comments: [
-              {
-                id: 'c1',
-                userId: 'user1',
-                userName: 'Finance Team',
-                comment: 'Invoice has been verified and all documentation is complete.',
-                timestamp: new Date(Date.now() - 30 * 60 * 1000),
-                type: 'comment'
-              }
-            ],
-            escalationLevel: 0
-          },
-          {
-            _id: '2',
-            title: 'Review Employee Onboarding Documents',
-            description: 'Complete review of new employee Sarah Wilson\'s onboarding documents and approve access permissions.',
-            processName: 'Employee Onboarding',
-            processId: 'proc_002',
-            assignee: user?.name || 'Current User',
-            assigneeRole: user?.role || 'manager',
-            priority: 'medium',
-            status: 'in_progress',
-            type: 'review',
-            dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day from now
-            createdDate: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-            estimatedDuration: 30,
-            attachments: [
-              {
-                id: 'att2',
-                name: 'onboarding_checklist.pdf',
-                url: '#',
-                type: 'application/pdf',
-                size: 156780,
-                uploadedBy: 'HR Team',
-                uploadedAt: new Date()
-              },
-              {
-                id: 'att3',
-                name: 'background_check.pdf',
-                url: '#',
-                type: 'application/pdf',
-                size: 98432,
-                uploadedBy: 'HR Team',
-                uploadedAt: new Date()
-              }
-            ],
-            comments: [],
-            escalationLevel: 0
-          },
-          {
-            _id: '3',
-            title: 'Vendor Payment Authorization',
-            description: 'Authorize payment of $15,000 to TechSolutions Inc. for software licensing.',
-            processName: 'Vendor Payment Process',
-            processId: 'proc_003',
-            assignee: user?.name || 'Current User',
-            assigneeRole: user?.role || 'manager',
-            priority: 'urgent',
-            status: 'pending',
-            type: 'approval',
-            dueDate: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
-            createdDate: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-            estimatedDuration: 10,
-            requiredApprovals: 2,
-            currentApprovals: 1,
-            attachments: [
-              {
-                id: 'att4',
-                name: 'payment_request.pdf',
-                url: '#',
-                type: 'application/pdf',
-                size: 234567,
-                uploadedBy: 'Procurement Team',
-                uploadedAt: new Date()
-              }
-            ],
-            comments: [
-              {
-                id: 'c2',
-                userId: 'user2',
-                userName: 'CFO',
-                comment: 'Budget has been verified. This payment is approved from my end.',
-                timestamp: new Date(Date.now() - 45 * 60 * 1000),
-                type: 'approval'
-              }
-            ],
-            escalationLevel: 1
-          },
-          {
-            _id: '4',
-            title: 'Quality Check - Product Batch #2024-Q1-089',
-            description: 'Perform quality verification for product batch before shipment approval.',
-            processName: 'Quality Assurance Process',
-            processId: 'proc_004',
-            assignee: user?.name || 'Current User',
-            assigneeRole: user?.role || 'manager',
-            priority: 'medium',
-            status: 'completed',
-            type: 'verification',
-            dueDate: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            createdDate: new Date(Date.now() - 8 * 60 * 60 * 1000), // 8 hours ago
-            completedDate: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-            estimatedDuration: 45,
-            actualDuration: 38,
-            attachments: [],
-            comments: [
-              {
-                id: 'c3',
-                userId: 'user3',
-                userName: user?.name || 'Current User',
-                comment: 'Quality check completed. All parameters within acceptable ranges.',
-                timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-                type: 'approval'
-              }
-            ],
-            escalationLevel: 0
-          }
-        ];
-        setTasks(mockTasks);
-        setLoading(false);
-      }, 1000);
+      setLoading(true);
+      const response = await api.get('/tasks');
+      setTasks(response.data.data?.tasks || []);
     } catch (error) {
       console.error('Error fetching tasks:', error);
+      setSnackbar({ open: true, message: 'Error fetching tasks', severity: 'error' });
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleTaskAction = async (taskId: string, action: 'approve' | 'reject' | 'complete' | 'start') => {
+  const fetchUsers = async () => {
     try {
-      // Simulate API call
-      console.log(`Performing ${action} on task ${taskId}`);
-      
-      setTasks(prev => prev.map(task => {
-        if (task._id === taskId) {
-          const updatedTask = { ...task };
-          switch (action) {
-            case 'approve':
-              updatedTask.status = 'completed';
-              updatedTask.completedDate = new Date();
-              break;
-            case 'reject':
-              updatedTask.status = 'rejected';
-              break;
-            case 'complete':
-              updatedTask.status = 'completed';
-              updatedTask.completedDate = new Date();
-              break;
-            case 'start':
-              updatedTask.status = 'in_progress';
-              break;
-          }
-          return updatedTask;
-        }
-        return task;
-      }));
-      
-      setTaskDetailOpen(false);
+      const response = await api.get('/auth/users');
+      setUsers(response.data.users || []);
     } catch (error) {
-      console.error('Error performing task action:', error);
+      console.error('Error fetching users:', error);
     }
   };
 
-  const handleAddComment = () => {
-    if (!comment.trim() || !selectedTask) return;
-    
-    const newComment: TaskComment = {
-      id: `c_${Date.now()}`,
-      userId: user?.id || 'current_user',
-      userName: user?.name || 'Current User',
-      comment: comment.trim(),
-      timestamp: new Date(),
-      type: 'comment'
-    };
-    
-    setTasks(prev => prev.map(task => {
-      if (task._id === selectedTask._id) {
-        return {
-          ...task,
-          comments: [...task.comments, newComment]
-        };
+  const handleCreate = () => {
+    setEditingTask(null);
+    setFormData({
+      taskName: '',
+      description: '',
+      status: 'pending',
+      priority: 'medium',
+      assignedTo: '',
+      dueDate: '',
+      category: '',
+      progress: 0
+    });
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (task: Task) => {
+    if (!task || !task._id) {
+      console.error('Invalid task object passed to handleEdit:', task);
+      setSnackbar({ 
+        open: true, 
+        message: 'Error: Invalid task data', 
+        severity: 'error' 
+      });
+      return;
+    }
+
+    setEditingTask(task);
+    setFormData({
+      taskName: task.taskName || '',
+      description: task.description || '',
+      status: task.status || 'pending',
+      priority: task.priority || 'medium',
+      assignedTo: task.assignedTo?._id || '',
+      dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+      category: task.category || '',
+      progress: task.progress || 0
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (taskId: string) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+
+    try {
+      await api.delete(`/tasks/${taskId}`);
+      setSnackbar({ open: true, message: 'Task deleted successfully', severity: 'success' });
+      fetchTasks();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      setSnackbar({ open: true, message: 'Error deleting task', severity: 'error' });
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const taskData = {
+        ...formData,
+        assignedTo: formData.assignedTo || null
+      };
+
+      if (editingTask) {
+        await api.put(`/tasks/${editingTask._id}`, taskData);
+        setSnackbar({ open: true, message: 'Task updated successfully', severity: 'success' });
+      } else {
+        await api.post('/tasks', taskData);
+        setSnackbar({ open: true, message: 'Task created successfully', severity: 'success' });
       }
-      return task;
-    }));
-    
-    setSelectedTask(prev => prev ? {
-      ...prev,
-      comments: [...prev.comments, newComment]
-    } : null);
-    
-    setComment('');
+      setDialogOpen(false);
+      fetchTasks();
+    } catch (error) {
+      console.error('Error saving task:', error);
+      setSnackbar({ open: true, message: 'Error saving task', severity: 'error' });
+    }
+  };
+
+  const handleStatusChange = async (taskId: string, newStatus: string) => {
+    try {
+      await api.put(`/tasks/${taskId}`, { status: newStatus });
+      setSnackbar({ open: true, message: 'Task status updated', severity: 'success' });
+      fetchTasks();
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      setSnackbar({ open: true, message: 'Error updating task status', severity: 'error' });
+    }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'error';
-      case 'high': return 'warning';
-      case 'medium': return 'info';
-      case 'low': return 'success';
-      default: return 'default';
+      case 'urgent':
+        return 'error' as const;
+      case 'high':
+        return 'warning' as const;
+      case 'medium':
+        return 'info' as const;
+      default:
+        return 'default' as const;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'success';
-      case 'in_progress': return 'info';
-      case 'pending': return 'warning';
-      case 'rejected': return 'error';
-      case 'escalated': return 'error';
-      default: return 'default';
+      case 'completed':
+        return 'success' as const;
+      case 'in-progress':
+        return 'primary' as const;
+      case 'on-hold':
+        return 'warning' as const;
+      default:
+        return 'default' as const;
     }
   };
 
-  const getTasksByStatus = (status: string) => {
-    return tasks.filter(task => {
-      const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          task.processName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-      const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-      const matchesTabStatus = status === 'all' || task.status === status;
-      
-      return matchesSearch && matchesPriority && matchesStatus && matchesTabStatus;
-    });
-  };
-
-  const pendingTasks = getTasksByStatus('pending');
-  const inProgressTasks = getTasksByStatus('in_progress');
-  const completedTasks = getTasksByStatus('completed');
-  const allTasks = getTasksByStatus('all');
-
-  const formatTimeRemaining = (dueDate: Date) => {
-    const now = new Date();
-    const diff = dueDate.getTime() - now.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (diff < 0) {
-      return `Overdue by ${Math.abs(hours)}h ${Math.abs(minutes)}m`;
-    } else if (hours === 0) {
-      return `${minutes}m remaining`;
-    } else {
-      return `${hours}h ${minutes}m remaining`;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CompleteIcon />;
+      case 'in-progress':
+        return <InProgressIcon />;
+      case 'on-hold':
+        return <PendingIcon />;
+      default:
+        return <PendingIcon />;
     }
   };
 
-  const isOverdue = (dueDate: Date) => {
-    return new Date() > dueDate;
+  const filterTasksByTab = () => {
+    switch (tabValue) {
+      case 0: // All tasks
+        return tasks;
+      case 1: // My tasks
+        return tasks.filter(task => task.assignedTo?._id === currentUser?.id);
+      case 2: // Pending
+        return tasks.filter(task => task.status === 'pending');
+      case 3: // In Progress
+        return tasks.filter(task => task.status === 'in-progress');
+      case 4: // Completed
+        return tasks.filter(task => task.status === 'completed');
+      default:
+        return tasks;
+    }
   };
 
-  const TaskCard: React.FC<{ task: Task }> = ({ task }) => (
-    <Card 
-      sx={{ 
-        mb: 2, 
-        cursor: 'pointer',
-        border: selectedTask?._id === task._id ? '2px solid' : '1px solid',
-        borderColor: selectedTask?._id === task._id ? 'primary.main' : 'grey.300',
-        '&:hover': { boxShadow: 4 }
-      }}
-      onClick={() => {
-        setSelectedTask(task);
-        setTaskDetailOpen(true);
-      }}
-    >
-      <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" component="h3" gutterBottom>
-              {task.title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              {task.processName}
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              {task.description}
-            </Typography>
-          </Box>
-          <IconButton size="small">
-            <MoreVert />
-          </IconButton>
-        </Box>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Chip 
-            label={task.priority.toUpperCase()} 
-            color={getPriorityColor(task.priority) as any}
-            size="small"
-          />
-          <Chip 
-            label={task.status.replace('_', ' ').toUpperCase()} 
-            color={getStatusColor(task.status) as any}
-            size="small"
-          />
-          <Chip 
-            label={task.type.replace('_', ' ').toUpperCase()} 
-            variant="outlined"
-            size="small"
-          />
-        </Box>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Tooltip title="Due Date">
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Schedule fontSize="small" color={isOverdue(task.dueDate) ? 'error' : 'action'} />
-                <Typography variant="caption" color={isOverdue(task.dueDate) ? 'error' : 'text.secondary'}>
-                  {formatTimeRemaining(task.dueDate)}
-                </Typography>
-              </Box>
-            </Tooltip>
-            
-            {task.attachments.length > 0 && (
-              <Tooltip title={`${task.attachments.length} attachments`}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AttachFile fontSize="small" color="action" />
-                  <Typography variant="caption" color="text.secondary">
-                    {task.attachments.length}
-                  </Typography>
-                </Box>
-              </Tooltip>
-            )}
-            
-            {task.comments.length > 0 && (
-              <Tooltip title={`${task.comments.length} comments`}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Comment fontSize="small" color="action" />
-                  <Typography variant="caption" color="text.secondary">
-                    {task.comments.length}
-                  </Typography>
-                </Box>
-              </Tooltip>
-            )}
-          </Box>
-          
-          {task.requiredApprovals && (
-            <LinearProgress 
-              variant="determinate" 
-              value={(task.currentApprovals || 0) / task.requiredApprovals * 100}
-              sx={{ width: 60, height: 6 }}
-            />
-          )}
-        </Box>
-      </CardContent>
-    </Card>
-  );
-
-  if (loading) {
-    return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <LinearProgress sx={{ mb: 2 }} />
-        <Typography>Loading your tasks...</Typography>
-      </Box>
-    );
-  }
+  const filteredTasks = filterTasksByTab();
+  const pendingCount = tasks.filter(task => task.status === 'pending').length;
+  const inProgressCount = tasks.filter(task => task.status === 'in-progress').length;
+  const completedCount = tasks.filter(task => task.status === 'completed').length;
+  const myTasksCount = tasks.filter(task => task.assignedTo?._id === currentUser?.id).length;
 
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Task Inbox
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Manage your assigned tasks, approvals, and process activities
-        </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box>
+          <Typography variant="h4" component="h1" gutterBottom>
+            <TaskIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Task Management
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
+            Manage and track your tasks and assignments
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={fetchTasks}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreate}
+          >
+            Create Task
+          </Button>
+        </Box>
       </Box>
 
-      {/* Filters and Search */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              placeholder="Search tasks..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={2}>
-            <FormControl fullWidth>
-              <InputLabel>Priority</InputLabel>
-              <Select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                input={<OutlinedInput label="Priority" />}
-              >
-                <MenuItem value="all">All Priorities</MenuItem>
-                <MenuItem value="urgent">Urgent</MenuItem>
-                <MenuItem value="high">High</MenuItem>
-                <MenuItem value="medium">Medium</MenuItem>
-                <MenuItem value="low">Low</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={2}>
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                input={<OutlinedInput label="Status" />}
-              >
-                <MenuItem value="all">All Statuses</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="in_progress">In Progress</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="rejected">Rejected</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                startIcon={<Refresh />}
-                onClick={fetchTasks}
-              >
-                Refresh
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<FilterList />}
-                onClick={(e) => setFilterAnchor(e.currentTarget)}
-              >
-                More Filters
-              </Button>
-            </Box>
-          </Grid>
+      {/* Stats Cards */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography variant="h4" color="primary.main">
+                {tasks.length}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Total Tasks
+              </Typography>
+            </CardContent>
+          </Card>
         </Grid>
-      </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography variant="h4" color="warning.main">
+                {pendingCount}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Pending Tasks
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography variant="h4" color="info.main">
+                {inProgressCount}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                In Progress
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography variant="h4" color="success.main">
+                {completedCount}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Completed
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-      {/* Task Tabs */}
-      <Paper sx={{ mb: 3 }}>
+      {/* Task Tabs and Table */}
+      <Card>
         <Tabs 
           value={tabValue} 
           onChange={(_, newValue) => setTabValue(newValue)}
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+          sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
         >
+          <Tab label="All Tasks" />
           <Tab 
             label={
-              <Badge badgeContent={pendingTasks.length} color="warning">
+              <Badge badgeContent={myTasksCount} color="primary">
+                My Tasks
+              </Badge>
+            } 
+          />
+          <Tab 
+            label={
+              <Badge badgeContent={pendingCount} color="warning">
                 Pending
               </Badge>
             } 
           />
           <Tab 
             label={
-              <Badge badgeContent={inProgressTasks.length} color="info">
+              <Badge badgeContent={inProgressCount} color="info">
                 In Progress
               </Badge>
             } 
           />
           <Tab 
             label={
-              <Badge badgeContent={completedTasks.length} color="success">
+              <Badge badgeContent={completedCount} color="success">
                 Completed
-              </Badge>
-            } 
-          />
-          <Tab 
-            label={
-              <Badge badgeContent={allTasks.length} color="primary">
-                All Tasks
               </Badge>
             } 
           />
         </Tabs>
 
-        <TabPanel value={tabValue} index={0}>
-          {pendingTasks.length > 0 ? (
-            pendingTasks.map(task => <TaskCard key={task._id} task={task} />)
+        <CardContent>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
           ) : (
-            <Alert severity="info" sx={{ m: 2 }}>
-              No pending tasks found.
-            </Alert>
-          )}
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={1}>
-          {inProgressTasks.length > 0 ? (
-            inProgressTasks.map(task => <TaskCard key={task._id} task={task} />)
-          ) : (
-            <Alert severity="info" sx={{ m: 2 }}>
-              No tasks in progress found.
-            </Alert>
-          )}
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={2}>
-          {completedTasks.length > 0 ? (
-            completedTasks.map(task => <TaskCard key={task._id} task={task} />)
-          ) : (
-            <Alert severity="info" sx={{ m: 2 }}>
-              No completed tasks found.
-            </Alert>
-          )}
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={3}>
-          {allTasks.length > 0 ? (
-            allTasks.map(task => <TaskCard key={task._id} task={task} />)
-          ) : (
-            <Alert severity="info" sx={{ m: 2 }}>
-              No tasks found matching your criteria.
-            </Alert>
-          )}
-        </TabPanel>
-      </Paper>
-
-      {/* Task Detail Dialog */}
-      <Dialog 
-        open={taskDetailOpen} 
-        onClose={() => setTaskDetailOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        {selectedTask && (
-          <>
-            <DialogTitle>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h6">{selectedTask.title}</Typography>
-                <IconButton onClick={() => setTaskDetailOpen(false)}>
-                  <Close />
-                </IconButton>
-              </Box>
-            </DialogTitle>
-            <DialogContent>
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={8}>
-                  <Typography variant="body1" sx={{ mb: 2 }}>
-                    {selectedTask.description}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" gutterBottom>
-                    Process: {selectedTask.processName}
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-                    <Chip 
-                      label={selectedTask.priority.toUpperCase()} 
-                      color={getPriorityColor(selectedTask.priority) as any}
-                      size="small"
-                    />
-                    <Chip 
-                      label={selectedTask.status.replace('_', ' ').toUpperCase()} 
-                      color={getStatusColor(selectedTask.status) as any}
-                      size="small"
-                    />
-                  </Box>
-
-                  {selectedTask.attachments.length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Attachments
-                      </Typography>
-                      <List dense>
-                        {selectedTask.attachments.map(attachment => (
-                          <ListItem key={attachment.id}>
-                            <ListItemAvatar>
-                              <Avatar>
-                                <AttachFile />
-                              </Avatar>
-                            </ListItemAvatar>
-                            <ListItemText 
-                              primary={attachment.name}
-                              secondary={`${(attachment.size / 1024).toFixed(1)} KB • ${attachment.uploadedBy}`}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Box>
-                  )}
-
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Comments & Activity
-                    </Typography>
-                    <List>
-                      {selectedTask.comments.map(comment => (
-                        <ListItem key={comment.id} alignItems="flex-start">
-                          <ListItemAvatar>
-                            <Avatar>{comment.userName.charAt(0)}</Avatar>
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={comment.userName}
-                            secondary={
-                              <>
-                                <Typography component="span" variant="body2">
-                                  {comment.comment}
-                                </Typography>
-                                <br />
-                                <Typography variant="caption" color="text.secondary">
-                                  {comment.timestamp.toLocaleString()}
-                                </Typography>
-                              </>
-                            }
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Task</TableCell>
+                    <TableCell>Assigned To</TableCell>
+                    <TableCell>Priority</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Progress</TableCell>
+                    <TableCell>Due Date</TableCell>
+                    <TableCell>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredTasks.filter(task => task && task._id).map((task) => (
+                    <TableRow key={task._id}>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="medium">
+                            {task.taskName}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {task.description}
+                          </Typography>
+                          {task.category && (
+                            <Chip label={task.category} size="small" sx={{ mt: 0.5 }} />
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        {task.assignedTo ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Avatar sx={{ width: 24, height: 24 }}>
+                              {task.assignedTo.name.charAt(0)}
+                            </Avatar>
+                            <Typography variant="body2">
+                              {task.assignedTo.name}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Unassigned
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={task.priority}
+                          color={getPriorityColor(task.priority)}
+                          size="small"
+                          icon={task.priority === 'urgent' ? <HighPriorityIcon /> : undefined}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={task.status}
+                          color={getStatusColor(task.status)}
+                          size="small"
+                          icon={getStatusIcon(task.status)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={task.progress} 
+                            sx={{ width: 60 }}
                           />
-                        </ListItem>
-                      ))}
-                    </List>
-                    
-                    <Box sx={{ mt: 2 }}>
-                      <TextField
-                        fullWidth
-                        placeholder="Add a comment..."
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        multiline
-                        rows={2}
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <Button onClick={handleAddComment}>Post</Button>
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </Box>
-                  </Box>
-                </Grid>
-                
-                <Grid item xs={12} md={4}>
-                  <Paper sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Task Details
-                    </Typography>
-                    <List dense>
-                      <ListItem>
-                        <ListItemText 
-                          primary="Assignee"
-                          secondary={selectedTask.assignee}
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemText 
-                          primary="Due Date"
-                          secondary={selectedTask.dueDate.toLocaleString()}
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemText 
-                          primary="Created"
-                          secondary={selectedTask.createdDate.toLocaleString()}
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemText 
-                          primary="Estimated Duration"
-                          secondary={`${selectedTask.estimatedDuration} minutes`}
-                        />
-                      </ListItem>
-                      {selectedTask.requiredApprovals && (
-                        <ListItem>
-                          <ListItemText 
-                            primary="Approvals"
-                            secondary={`${selectedTask.currentApprovals || 0} of ${selectedTask.requiredApprovals}`}
-                          />
-                        </ListItem>
-                      )}
-                    </List>
-                  </Paper>
-                </Grid>
-              </Grid>
-            </DialogContent>
-            <DialogActions>
-              {selectedTask.status === 'pending' && (
-                <>
-                  <Button onClick={() => setTaskDetailOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    variant="outlined"
-                    onClick={() => handleTaskAction(selectedTask._id, 'start')}
-                  >
-                    Start Task
-                  </Button>
-                  {selectedTask.type === 'approval' && (
-                    <>
-                      <Button 
-                        variant="outlined"
-                        color="error"
-                        onClick={() => handleTaskAction(selectedTask._id, 'reject')}
-                      >
-                        Reject
-                      </Button>
-                      <Button 
-                        variant="contained"
-                        onClick={() => handleTaskAction(selectedTask._id, 'approve')}
-                      >
-                        Approve
-                      </Button>
-                    </>
-                  )}
-                </>
-              )}
-              
-              {selectedTask.status === 'in_progress' && (
-                <>
-                  <Button onClick={() => setTaskDetailOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    variant="contained"
-                    onClick={() => handleTaskAction(selectedTask._id, 'complete')}
-                  >
-                    Complete Task
-                  </Button>
-                </>
-              )}
-              
-              {selectedTask.status === 'completed' && (
-                <Button onClick={() => setTaskDetailOpen(false)}>
-                  Close
-                </Button>
-              )}
-            </DialogActions>
-          </>
-        )}
+                          <Typography variant="body2">
+                            {task.progress}%
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEdit(task)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDelete(task._id)}
+                          color="error"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Task Form Dialog */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {editingTask ? 'Edit Task' : 'Create New Task'}
+        </DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Task Title"
+                value={formData.taskName}
+                onChange={(e) => setFormData({ ...formData, taskName: e.target.value })}
+                required
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Description"
+                multiline
+                rows={3}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Status"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              >
+                {statuses.map((status) => (
+                  <MenuItem key={status} value={status}>
+                    {status}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Priority"
+                value={formData.priority}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+              >
+                {priorities.map((priority) => (
+                  <MenuItem key={priority} value={priority}>
+                    {priority}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Assign To"
+                value={formData.assignedTo}
+                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+              >
+                <MenuItem value="">Unassigned</MenuItem>
+                {users.map((user) => (
+                  <MenuItem key={user._id} value={user._id}>
+                    {user.name} ({user.email})
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                fullWidth
+                label="Category"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              >
+                {categories.map((category) => (
+                  <MenuItem key={category} value={category}>
+                    {category}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Due Date"
+                type="date"
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Progress (%)"
+                type="number"
+                value={formData.progress}
+                onChange={(e) => setFormData({ ...formData, progress: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) })}
+                inputProps={{ min: 0, max: 100 }}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained">
+            {editingTask ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
       </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

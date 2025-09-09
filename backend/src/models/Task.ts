@@ -130,7 +130,7 @@ const TaskSchema = new Schema<ITask>(
     assignedTo: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'Assigned user is required'],
+      required: false,
       index: true
     },
     assignedBy: {

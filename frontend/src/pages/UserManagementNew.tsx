@@ -166,24 +166,14 @@ const UserManagement: React.FC = () => {
   };
 
   const handleEdit = (user: User) => {
-    if (!user || !user._id) {
-      console.error('Invalid user object passed to handleEdit:', user);
-      setSnackbar({ 
-        open: true, 
-        message: 'Error: Invalid user data', 
-        severity: 'error' 
-      });
-      return;
-    }
-    
     setEditingUser(user);
     setFormData({
-      name: user.name || '',
-      email: user.email || '',
+      name: user.name,
+      email: user.email,
       password: '',
-      role: user.role || 'user',
-      department: user.department || '',
-      isActive: user.isActive !== false
+      role: user.role,
+      department: user.department,
+      isActive: user.isActive
     });
     setDialogOpen(true);
   };
@@ -405,7 +395,7 @@ const UserManagement: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {users.filter(user => user && user._id).map((user) => (
+                  {users.map((user) => (
                     <TableRow key={user._id}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
