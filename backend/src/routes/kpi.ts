@@ -5,7 +5,9 @@ import {
   createKPI, 
   updateKPI, 
   deleteKPI,
-  getAnalytics
+  getAnalytics,
+  getAdvancedAnalytics,
+  getForecastData
 } from '../controllers/kpiController';
 import { protect } from '../middleware/auth';
 
@@ -21,6 +23,12 @@ router.route('/dashboard')
 
 router.route('/analytics')
   .get(protect, getAnalytics);
+
+router.route('/analytics/advanced')
+  .get(protect, getAdvancedAnalytics);
+
+router.route('/forecast')
+  .get(protect, getForecastData);
 
 router.route('/:id')
   .put(protect, updateKPI)

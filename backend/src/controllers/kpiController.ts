@@ -164,6 +164,193 @@ export const getDashboard = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// @desc    Get advanced analytics data
+// @route   GET /api/kpi/analytics
+// @access  Private
+export const getAdvancedAnalytics = async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.user.companyId || req.user._id;
+    const days = parseInt(req.query.days as string) || 30;
+    
+    const dateFrom = new Date();
+    dateFrom.setDate(dateFrom.getDate() - days);
+
+    // Performance trends by category
+    const categoryTrends = await KPI.aggregate([
+      {
+        $match: {
+          companyId: companyId,
+          isActive: true,
+          date: { $gte: dateFrom }
+        }
+      },
+      {
+        $group: {
+          _id: '$category',
+          avgPerformance: { $avg: { $divide: ['$value', '$target'] } },
+          totalMetrics: { $sum: 1 },
+          achievedTargets: {
+            $sum: {
+              $cond: [{ $gte: ['$value', '$target'] }, 1, 0]
+            }
+          },
+          trends: {
+            $push: {
+              date: '$date',
+              value: '$value',
+              target: '$target',
+              achievement: { $divide: ['$value', '$target'] }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          achievementRate: { $divide: ['$achievedTargets', '$totalMetrics'] }
+        }
+      }
+    ]);
+
+    // Monthly comparison data
+    const monthlyComparison = await KPI.aggregate([
+      {
+        $match: {
+          companyId: companyId,
+          isActive: true,
+          date: { $gte: dateFrom }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$date' },
+            month: { $month: '$date' },
+            category: '$category'
+          },
+          avgValue: { $avg: '$value' },
+          avgTarget: { $avg: '$target' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1 }
+      }
+    ]);
+
+    // Top and bottom performers
+    const performers = await KPI.aggregate([
+      {
+        $match: {
+          companyId: companyId,
+          isActive: true
+        }
+      },
+      {
+        $addFields: {
+          performance: { $divide: ['$value', '$target'] }
+        }
+      },
+      {
+        $sort: { performance: -1 }
+      },
+      {
+        $group: {
+          _id: null,
+          topPerformers: { $push: { $cond: [{ $lte: ['$$ROOT.performance', 2] }, '$$ROOT', '$$REMOVE'] } },
+          bottomPerformers: { $push: { $cond: [{ $gte: ['$$ROOT.performance', 0.5] }, '$$ROOT', '$$REMOVE'] } }
+        }
+      },
+      {
+        $project: {
+          topPerformers: { $slice: ['$topPerformers', 5] },
+          bottomPerformers: { $slice: [{ $reverseArray: '$bottomPerformers' }, 5] }
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        categoryTrends,
+        monthlyComparison,
+        performers: performers[0] || { topPerformers: [], bottomPerformers: [] },
+        analysisDate: new Date(),
+        timeRange: `${days} days`
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching advanced analytics:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get forecasting data
+// @route   GET /api/kpi/forecast
+// @access  Private
+export const getForecastData = async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.user.companyId || req.user._id;
+    const metricId = req.query.metricId as string;
+    const forecastDays = parseInt(req.query.days as string) || 30;
+
+    let filter: any = { companyId: companyId, isActive: true };
+    if (metricId) {
+      filter._id = metricId;
+    }
+
+    // Get historical data for the last 90 days
+    const historicalDate = new Date();
+    historicalDate.setDate(historicalDate.getDate() - 90);
+    filter.date = { $gte: historicalDate };
+
+    const historicalData = await KPI.find(filter)
+      .sort({ date: 1 })
+      .limit(100);
+
+    // Simple linear regression for forecasting (mock implementation)
+    const generateForecast = (data: any[]) => {
+      if (data.length < 2) return [];
+      
+      const forecast = [];
+      const lastValue = data[data.length - 1].value;
+      const trend = data.length > 1 ? 
+        (data[data.length - 1].value - data[0].value) / data.length : 0;
+
+      for (let i = 1; i <= forecastDays; i++) {
+        const forecastDate = new Date();
+        forecastDate.setDate(forecastDate.getDate() + i);
+        
+        const forecastValue = lastValue + (trend * i);
+        forecast.push({
+          date: forecastDate,
+          predictedValue: Math.max(0, forecastValue),
+          confidence: Math.max(0.3, 1 - (i / forecastDays) * 0.4) // Decreasing confidence
+        });
+      }
+      
+      return forecast;
+    };
+
+    const forecast = generateForecast(historicalData);
+
+    res.json({
+      success: true,
+      data: {
+        historical: historicalData,
+        forecast: forecast,
+        metadata: {
+          forecastDays,
+          dataPoints: historicalData.length,
+          generatedAt: new Date()
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('Error generating forecast:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Create new KPI
 // @route   POST /api/kpi
 // @access  Private
