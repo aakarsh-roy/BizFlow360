@@ -17,7 +17,9 @@ import {
   ListItemText,
   ListItemAvatar,
   Divider,
-  LinearProgress
+  LinearProgress,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   PlayArrow,
@@ -33,10 +35,15 @@ import {
   AutoMode,
   Analytics,
   Speed,
-  AccountTree
+  AccountTree,
+  AutoAwesome,
+  SmartToy,
+  Psychology,
+  Inventory
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import AIDashboardWidget from '../components/AIDashboardWidget';
 
 // BPA Dashboard interfaces
 interface BPAStats {
@@ -85,6 +92,31 @@ const BPADashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Tab Panel Component
+  interface TabPanelProps {
+    children?: React.ReactNode;
+    index: number;
+    value: number;
+  }
+
+  const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`dashboard-tabpanel-${index}`}
+        aria-labelledby={`dashboard-tab-${index}`}
+      >
+        {value === index && (
+          <Box sx={{ pt: 3 }}>
+            {children}
+          </Box>
+        )}
+      </div>
+    );
+  };
   const [stats, setStats] = useState<BPAStats>({
     totalProcesses: 0,
     activeProcesses: 0,
@@ -98,7 +130,7 @@ const BPADashboard: React.FC = () => {
   const [processAlerts, setProcessAlerts] = useState<ProcessAlert[]>([]);
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
 
-  // BPA Modules
+  // Regular BPA Modules
   const bpaModules: BPAModule[] = [
     {
       id: 'workflow-builder',
@@ -109,6 +141,7 @@ const BPADashboard: React.FC = () => {
       path: '/workflow-builder',
       restricted: ['admin', 'manager']
     },
+
     {
       id: 'task-inbox',
       title: 'Task Inbox',
@@ -126,6 +159,7 @@ const BPADashboard: React.FC = () => {
       color: 'success',
       path: '/kpi-dashboard'
     },
+
     {
       id: 'process-monitor',
       title: 'Process Monitor',
@@ -134,6 +168,7 @@ const BPADashboard: React.FC = () => {
       color: 'warning',
       path: '/process-monitor'
     },
+
     {
       id: 'inventory',
       title: 'Inventory Management',
@@ -142,6 +177,7 @@ const BPADashboard: React.FC = () => {
       color: 'primary',
       path: '/inventory'
     },
+
     {
       id: 'automation-hub',
       title: 'Automation Hub',
@@ -174,6 +210,79 @@ const BPADashboard: React.FC = () => {
       icon: <Build />,
       color: 'secondary',
       path: '/settings',
+      restricted: ['admin']
+    }
+  ];
+
+  // AI Modules - Separate array for AI-powered features
+  const aiModules: BPAModule[] = [
+    {
+      id: 'ai-dashboard',
+      title: 'AI Control Center',
+      description: 'Monitor and manage all AI-powered features across BizFlow360',
+      icon: <SmartToy />,
+      color: 'primary',
+      path: '/ai-dashboard',
+      restricted: ['admin', 'manager']
+    },
+    {
+      id: 'automated-workflow-builder',
+      title: 'AI Workflow Builder',
+      description: 'Generate workflows using AI from natural language descriptions and templates',
+      icon: <AutoAwesome />,
+      color: 'secondary',
+      path: '/automated-workflow-builder',
+      restricted: ['admin', 'manager']
+    },
+    {
+      id: 'ai-workflow-builder',
+      title: 'Enhanced AI Workflows',
+      description: 'Advanced AI workflow generation with templates and automation suggestions',
+      icon: <AutoAwesome />,
+      color: 'secondary',
+      path: '/ai-workflow-builder',
+      restricted: ['admin', 'manager']
+    },
+    {
+      id: 'ai-kpi-insights',
+      title: 'AI KPI Insights',
+      description: 'Intelligent KPI analysis with predictive forecasting and optimization',
+      icon: <Analytics />,
+      color: 'success',
+      path: '/ai-kpi-insights'
+    },
+    {
+      id: 'ai-process-optimizer',
+      title: 'AI Process Optimizer',
+      description: 'Intelligent process optimization with bottleneck identification and recommendations',
+      icon: <Speed />,
+      color: 'warning',
+      path: '/ai-process-optimizer'
+    },
+    {
+      id: 'ai-inventory-manager',
+      title: 'AI Inventory Manager',
+      description: 'Smart inventory management with demand forecasting and stock optimization',
+      icon: <Inventory />,
+      color: 'primary',
+      path: '/ai-inventory-manager'
+    },
+    {
+      id: 'ai-user-management',
+      title: 'AI User Analytics',
+      description: 'Intelligent user management with role suggestions and security insights',
+      icon: <Psychology />,
+      color: 'primary',
+      path: '/ai-user-management',
+      restricted: ['admin']
+    },
+    {
+      id: 'ai-data-manager',
+      title: 'AI Data Management',
+      description: 'Manage AI training data, monitor model health, and control machine learning systems',
+      icon: <AutoMode />,
+      color: 'secondary',
+      path: '/ai-data-manager',
       restricted: ['admin']
     }
   ];
@@ -259,16 +368,13 @@ const BPADashboard: React.FC = () => {
           setLoading(false);
         }, 1000);
 
+        // Insert AI widget data fetch here if desired in future
       } catch (error) {
-        console.error('Error fetching BPA data:', error);
         setLoading(false);
       }
     };
-
-    if (user) {
-      fetchBPAData();
-    }
-  }, [user]);
+    fetchBPAData();
+  }, []);
 
   const handleModuleClick = (path: string) => {
     navigate(path);
@@ -471,8 +577,64 @@ const BPADashboard: React.FC = () => {
               <AutoMode color="primary" />
               BPA Platform Modules
             </Typography>
-            <Grid container spacing={2}>
-              {accessibleModules.map((module) => (
+            
+            {/* Tabs for organizing modules */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+              <Tabs 
+                value={activeTab} 
+                onChange={(event, newValue) => setActiveTab(newValue)}
+                aria-label="module tabs"
+                sx={{
+                  '& .MuiTab-root': {
+                    minWidth: 120,
+                    fontWeight: 'medium'
+                  }
+                }}
+              >
+                <Tab 
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      Core Modules
+                      <Chip 
+                        label={accessibleModules.length} 
+                        size="small" 
+                        color="primary" 
+                        variant="outlined"
+                        sx={{ fontSize: '0.7rem', height: '20px' }}
+                      />
+                    </Box>
+                  }
+                  icon={<Dashboard />}
+                  id="dashboard-tab-0"
+                  aria-controls="dashboard-tabpanel-0"
+                />
+                <Tab 
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      AI Features
+                      <Chip 
+                        label={aiModules.filter(m => !m.restricted || m.restricted.includes(user?.role || 'user')).length} 
+                        size="small" 
+                        sx={{ 
+                          background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+                          color: 'white',
+                          fontSize: '0.7rem',
+                          height: '20px'
+                        }}
+                      />
+                    </Box>
+                  }
+                  icon={<SmartToy />}
+                  id="dashboard-tab-1"
+                  aria-controls="dashboard-tabpanel-1"
+                />
+              </Tabs>
+            </Box>
+
+            {/* Core Modules Tab */}
+            <TabPanel value={activeTab} index={0}>
+              <Grid container spacing={2}>
+                {accessibleModules.map((module) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={module.id}>
                   <Card sx={{ 
                     height: '100%',
@@ -525,7 +687,84 @@ const BPADashboard: React.FC = () => {
                   </Card>
                 </Grid>
               ))}
-            </Grid>
+              </Grid>
+            </TabPanel>
+
+            {/* AI Features Tab */}
+            <TabPanel value={activeTab} index={1}>
+              <Grid container spacing={2}>
+                {aiModules.filter(module => 
+                  !module.restricted || module.restricted.includes(user?.role || 'user')
+                ).map((module) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={module.id}>
+                    <Card sx={{ 
+                      height: '100%',
+                      transition: 'all 0.3s ease',
+                      '&:hover': { 
+                        transform: 'translateY(-4px)',
+                        boxShadow: 4,
+                        borderColor: `${module.color}.main`
+                      },
+                      border: '2px solid transparent',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(156, 39, 176, 0.05) 100%)'
+                    }}>
+                      <CardActionArea 
+                        onClick={() => handleModuleClick(module.path)}
+                        sx={{ height: '100%', p: 2 }}
+                      >
+                        <CardContent sx={{ textAlign: 'center', p: 1 }}>
+                          <Box sx={{ 
+                            color: `${module.color}.main`, 
+                            mb: 2,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            position: 'relative'
+                          }}>
+                            {React.cloneElement(module.icon, { sx: { fontSize: 40 } })}
+                            {module.badge && module.badge > 0 && (
+                              <Chip 
+                                label={module.badge}
+                                size="small"
+                                color="error"
+                                sx={{ 
+                                  position: 'absolute',
+                                  top: -8,
+                                  right: -8,
+                                  minWidth: '20px',
+                                  height: '20px'
+                                }}
+                              />
+                            )}
+                            {/* AI Badge */}
+                            <Chip
+                              label="AI"
+                              size="small"
+                              sx={{
+                                position: 'absolute',
+                                top: -12,
+                                left: -12,
+                                background: 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+                                color: 'white',
+                                fontSize: '0.7rem',
+                                height: '18px'
+                              }}
+                            />
+                          </Box>
+                          <Typography variant="h6" component="h3" gutterBottom sx={{ fontSize: '1rem' }}>
+                            {module.title}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+                            {module.description}
+                          </Typography>
+                        </CardContent>
+                      </CardActionArea>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </TabPanel>
           </Paper>
 
           {/* Process Alerts */}
@@ -610,7 +849,7 @@ const BPADashboard: React.FC = () => {
               Process Performance
             </Typography>
             <Grid container spacing={2}>
-              <Grid item xs={6}>
+              <Grid item xs={12} sm={6}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" color="success.main" sx={{ fontWeight: 'bold' }}>
                     {stats.avgProcessingTime}h
@@ -620,7 +859,7 @@ const BPADashboard: React.FC = () => {
                   </Typography>
                 </Box>
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={12} sm={6}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" color="primary.main" sx={{ fontWeight: 'bold' }}>
                     {formatCurrency(stats.automationSavings)}
@@ -689,6 +928,20 @@ const BPADashboard: React.FC = () => {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* AI Dashboard Widget - Analytics Area */}
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" gutterBottom sx={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          gap: 1,
+          mb: 3
+        }}>
+          <Analytics color="primary" />
+          AI Insights Dashboard
+        </Typography>
+        <AIDashboardWidget />
+      </Box>
     </Box>
   );
 };

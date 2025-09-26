@@ -30,7 +30,16 @@ import {
   Snackbar,
   Tabs,
   Tab,
-  Badge
+  Badge,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Tooltip,
+  Divider
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -42,10 +51,17 @@ import {
   PlayArrow as InProgressIcon,
   PriorityHigh as HighPriorityIcon,
   Person as AssignIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Psychology as AIIcon,
+  AutoAwesome as MagicIcon,
+  Lightbulb as RecommendationIcon,
+  TrendingUp as TrendIcon,
+  Speed as OptimizeIcon,
+  Star as PriorityIcon
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import { AITaskService, AITaskPrioritizationResult } from '../services/aiTaskService';
 
 interface Task {
   _id: string;
@@ -68,6 +84,29 @@ interface Task {
   progress: number;
   createdAt: string;
   updatedAt: string;
+  // AI-enhanced fields
+  aiPriorityScore?: number;
+  aiRecommendations?: string[];
+  predictedCompletionTime?: number;
+  urgencyFactors?: string[];
+  riskFactors?: string[];
+  optimizedAssignee?: string;
+}
+
+interface AITaskInsights {
+  totalTasks: number;
+  highPriorityCount: number;
+  overdueTasks: number;
+  averagePriorityScore: number;
+  bottleneckAreas: string[];
+  workloadDistribution: Record<string, number>;
+  recommendations: Array<{
+    recommendation: string;
+    priority: string;
+    impact_score: number;
+    action_items: string[];
+    expected_outcome: string;
+  }>;
 }
 
 interface TaskFormData {
@@ -106,6 +145,15 @@ const TaskInbox: React.FC = () => {
     progress: 0
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  // AI-related state
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiInsights, setAiInsights] = useState<AITaskInsights | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showAiRecommendations, setShowAiRecommendations] = useState(false);
+  const [sortByAI, setSortByAI] = useState(true);
+  const [aiPrioritizedTasks, setAiPrioritizedTasks] = useState<AITaskPrioritizationResult | null>(null);
+  const [showOptimizationDialog, setShowOptimizationDialog] = useState(false);
+  const [selectedTaskForOptimization, setSelectedTaskForOptimization] = useState<Task | null>(null);
 
   const statuses = ['pending', 'in-progress', 'completed', 'on-hold'];
   const priorities = ['low', 'medium', 'high', 'urgent'];
@@ -137,6 +185,75 @@ const TaskInbox: React.FC = () => {
       console.error('Error fetching users:', error);
     }
   };
+
+  // AI-related functions
+  const fetchAIPrioritizedTasks = async () => {
+    if (!aiEnabled) return;
+    
+    try {
+      setAiLoading(true);
+      const result = await AITaskService.getAIPrioritizedTasks({
+        includeCompleted: false
+      });
+      setAiPrioritizedTasks(result);
+      setAiInsights(result.insights);
+    } catch (error) {
+      console.error('Error fetching AI prioritized tasks:', error);
+      setSnackbar({ 
+        open: true, 
+        message: 'Failed to load AI insights', 
+        severity: 'error' 
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleOptimizeTask = async (task: Task) => {
+    setSelectedTaskForOptimization(task);
+    setShowOptimizationDialog(true);
+  };
+
+  const getAIEnhancedTasks = () => {
+    if (!aiEnabled || !aiPrioritizedTasks) return tasks;
+    
+    return tasks.map(task => {
+      const aiTask = aiPrioritizedTasks.prioritizedTasks.find(ai => ai.id === task._id);
+      if (aiTask) {
+        return {
+          ...task,
+          aiPriorityScore: aiTask.aiPriorityScore,
+          aiRecommendations: aiTask.aiRecommendations,
+          predictedCompletionTime: aiTask.predictedCompletionTime,
+          urgencyFactors: aiTask.urgencyFactors,
+          riskFactors: aiTask.riskFactors,
+          optimizedAssignee: aiTask.optimizedAssignee
+        };
+      }
+      return task;
+    });
+  };
+
+  const getSortedTasks = () => {
+    const enhancedTasks = getAIEnhancedTasks();
+    
+    if (sortByAI && aiEnabled) {
+      return enhancedTasks.sort((a, b) => {
+        const scoreA = a.aiPriorityScore || 0;
+        const scoreB = b.aiPriorityScore || 0;
+        return scoreB - scoreA;
+      });
+    }
+    
+    return enhancedTasks;
+  };
+
+  // Enhanced useEffect to include AI data
+  useEffect(() => {
+    if (aiEnabled && tasks.length > 0) {
+      fetchAIPrioritizedTasks();
+    }
+  }, [tasks, aiEnabled]);
 
   const handleCreate = () => {
     setEditingTask(null);

@@ -26,6 +26,16 @@ BizFlow360 is a comprehensive Business Process Automation (BPA) and Key Performa
 - Template library for common business processes
 - Version control and workflow history
 
+#### 🤖 **AI-Powered Automated Workflow Builder**
+- **Natural language workflow generation** using advanced AI processing
+- **Intelligent workflow analysis** with entity extraction and action identification
+- **Template-based generation** with 6+ pre-built business process templates
+- **Smart categorization** (HR, Finance, Support, Legal, Project Management, Operations)
+- **Complexity assessment** and time estimation algorithms
+- **Role inference** and automatic task assignment suggestions
+- **Workflow validation** and optimization recommendations
+- **Seamless integration** with manual workflow builder for refinement
+
 #### 📋 **Task Inbox & User Portal**
 - Centralized task management system
 - **Approval workflows** with comments and attachments
@@ -126,7 +136,76 @@ BizFlow360 is a comprehensive Business Process Automation (BPA) and Key Performa
 - **Relationships**: Efficient document references
 - **Caching**: Redis for session and query caching
 
-## 🏗 **Project Architecture**
+### 🚀 **AI-Powered Automated Workflow Builder**
+
+#### 🤖 **Natural Language Workflow Generation**
+- **AI-Powered Description Analysis**: Convert natural language descriptions into complete workflows
+- **Entity Extraction**: Automatically identify key entities (employees, documents, processes, etc.)
+- **Action Recognition**: Detect workflow actions (create, submit, review, approve, notify, etc.)
+- **Role Inference**: Smart assignment of tasks based on context and organizational structure
+- **Complexity Assessment**: Automatic evaluation of workflow complexity and time estimation
+
+#### 📚 **Template Library System**
+- **6 Pre-built Templates**: Employee Onboarding, Purchase Approval, Customer Support, Document Review, Project Initiation, Invoice Processing
+- **Category-based Organization**: HR, Finance, Support, Legal, Project Management, Operations
+- **Customization Support**: Template modification with user-specific requirements
+- **Template Statistics**: Usage analytics and performance metrics
+
+#### 🔧 **Advanced Features**
+- **Workflow Validation**: Comprehensive validation with error detection and suggestions
+- **Multi-tab Interface**: Separate AI generation and template library views
+- **Real-time Preview**: Live workflow visualization with node and connection mapping
+- **Export Integration**: Seamless export to manual workflow builder for refinement
+- **Confidence Scoring**: AI confidence levels for generated workflows
+
+#### 🌐 **API Endpoints**
+```bash
+# Workflow Generation
+POST /api/workflows/generate          # Generate from natural language
+POST /api/workflows/analyze           # Analyze description without generation
+POST /api/workflows/validate          # Validate workflow structure
+
+# Template Management
+GET /api/workflows/templates          # Get all templates (with category filter)
+GET /api/workflows/templates/:id      # Get specific template
+POST /api/workflows/templates/:id/generate  # Generate from template
+
+# Service Information
+GET /api/workflows/capabilities       # Get AI capabilities and features
+GET /api/workflows/template-stats     # Get template statistics
+GET /api/workflows/health            # Service health check
+```
+
+### 🎯 **Automated Workflow Builder Usage**
+
+#### **AI Generation Workflow**
+1. **Navigate** to "AI Workflow Builder" from BPA Dashboard
+2. **Describe** your business process in natural language
+3. **Select** category and complexity (optional)
+4. **Generate** workflow using AI processing
+5. **Review** generated nodes, connections, and metadata
+6. **Export** to manual builder for refinement or deployment
+
+#### **Template-based Generation**
+1. **Browse** template library by category
+2. **Select** appropriate template for your use case
+3. **Customize** template with specific requirements
+4. **Generate** workflow with personalized settings
+5. **Deploy** or modify in workflow builder
+
+#### **Example AI Descriptions**
+```
+"Create an employee onboarding process that includes background check, 
+manager approval, IT account setup, welcome email, and orientation scheduling."
+
+"Design a purchase approval workflow with budget validation, 
+multi-level approvals, and automatic purchase order generation."
+
+"Build a customer support ticket resolution process with 
+automatic routing, escalation rules, and satisfaction surveys."
+```
+
+## 🏗 **Enhanced Project Architecture**
 
 ```
 d:\Project\FinalYear\

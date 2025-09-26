@@ -1,22 +1,37 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 
 import connectDB from './config/database';
+import { initializeSocket } from './services/SocketService';
 import authRoutes from './routes/auth';
 import operationsRoutes from './routes/operations';
 import tasksRoutes from './routes/tasks';
 import kpiRoutes from './routes/kpi';
+import aiRoutes from './routes/aiRoutes';
+import aiTaskRoutes from './routes/aiTasks';
+import aiKPIRoutes from './routes/aiKPI';
+import enhancedAIRoutes from './routes/enhancedAI';
+import automatedWorkflowRoutes from './routes/automatedWorkflows';
+import workflowRoutes from './routes/workflow';
 import productRoutes from './modules/inventory/routes/productRoutes';
+import mlRoutes from './routes/ml';
+import chatRoutes from './routes/chat';
 import { errorHandler } from './middleware/errorHandler';
 import { seedKPIData, simulateRealTimeUpdates } from './seeders/kpiSeeder';
 
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
 
 // Connect to database
 connectDB();
+
+// Initialize Socket.IO for real-time chat
+const socketService = initializeSocket(server);
+console.log('🚀 Socket.IO initialized for real-time chat');
 
 // CORS
 app.use(cors({
@@ -48,7 +63,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api/operations', operationsRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/kpi', kpiRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/ai', aiTaskRoutes);
+app.use('/api/ai', aiKPIRoutes);
+app.use('/api/ai', enhancedAIRoutes);
+app.use('/api/workflows/automated', automatedWorkflowRoutes);
+app.use('/api/workflows', workflowRoutes);
 app.use('/api/inventory/products', productRoutes);
+app.use('/api/ml', mlRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -77,21 +100,36 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, async () => {
+server.listen(PORT, async () => {
   console.log(`🚀 BizFlow360 BPA Platform Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`💾 Database: MongoDB - All operations stored`);
-  console.log(`📦 Modules: BPA, Workflows, Tasks, Analytics, Operations`);
+  console.log(`📦 Modules: BPA, Workflows, Tasks, Analytics, Operations, AI Services, Automated Workflows`);
   console.log(`🔧 API Endpoints:`);
   console.log(`   - /api/auth/login - User authentication`);
   console.log(`   - /api/auth/register - User registration`);
+  console.log(`   - /api/workflows - Process definitions & instances`);
+  console.log(`   - /api/workflows/automated - Automated workflow generation`);
   console.log(`   - /api/operations/stock/movement - Stock updates`);
   console.log(`   - /api/operations/tasks - Task management`);
   console.log(`   - /api/operations/sales - Sales transactions`);
   console.log(`   - /api/kpi - KPI metrics`);
+  console.log(`   - /api/chat/* - Real-time team chat`);
+  console.log(`   - /api/ai/forecast - AI-powered forecasting`);
+  console.log(`   - /api/ai/analyze-text - NLP text analysis`);
+  console.log(`   - /api/ai/recommendations/* - Intelligent recommendations`);
+  console.log(`   - /api/ai/detect-anomalies - Anomaly detection`);
+  console.log(`   - /api/ai/dashboard - AI-enhanced dashboard`);
+  console.log(`   - /api/workflows/generate - Automated workflow generation`);
+  console.log(`   - /api/workflows/templates - Workflow template library`);
+  console.log(`   - /api/workflows/analyze - Workflow description analysis`);
   console.log(`   - /api/operations/workflow/step - Process steps`);
   console.log(`   - /api/operations/history - Audit trail`);
   console.log(`   - /api/operations/metrics - Real-time metrics`);
+  console.log(`   - /api/chat/rooms - Chat room management`);
+  console.log(`   - /api/chat/rooms/:id/messages - Real-time messaging`);
+  console.log(`   - /api/chat/search - Message search`);
+  console.log(`💬 Real-time chat with Socket.IO is active`);
   console.log(`✅ All business operations are being stored in MongoDB`);
   console.log(`📝 Audit logging is active for compliance tracking`);
   console.log(`🔍 Request logging is enabled`);
@@ -102,6 +140,18 @@ app.listen(PORT, async () => {
       setTimeout(async () => {
         await seedKPIData();
         console.log(`✅ KPI data seeding completed`);
+        
+        // Seed AI training data for enhanced AI services
+        const { AIDataSeeder } = await import('./services/AIDataSeeder');
+        const mongoose = await import('mongoose');
+        const defaultCompanyId = new mongoose.default.Types.ObjectId();
+        await AIDataSeeder.seedAITrainingData(defaultCompanyId.toString());
+        console.log(`🤖 AI training data seeding completed`);
+        
+        // Seed default chat rooms
+        const { ChatSeeder } = await import('./seeders/chatSeeder');
+        await ChatSeeder.seedDefaultChatRooms();
+        console.log(`💬 Chat rooms seeding completed`);
         
         // Start real-time simulation every 30 seconds
         setInterval(simulateRealTimeUpdates, 30000);

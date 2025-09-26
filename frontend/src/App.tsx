@@ -1,21 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, AppBar, Toolbar, Typography, Button } from '@mui/material';
 
 import Login from './pages/Login';
 import BPADashboard from './pages/BPADashboard';
 import WorkflowBuilder from './pages/WorkflowBuilder';
+import AutomatedWorkflowBuilder from './components/AutomatedWorkflowBuilder';
 import TaskInbox from './pages/TaskInbox';
 import KPIDashboard from './pages/KPIDashboard';
 import ProcessMonitor from './pages/ProcessMonitor';
 import UserManagement from './pages/UserManagement';
 import CompanySettings from './pages/CompanySettings';
 import InventoryManagement from './pages/InventoryManagement';
+import AIDashboard from './pages/AIDashboard';
+import TeamChat from './pages/TeamChat';
 import PrivateRoute from './components/PrivateRoute';
 import { useAuth } from './contexts/AuthContext';
+import { ChatProvider } from './contexts/ChatContext';
+
+// AI Components
+import AIKPIInsightsWidget from './components/AIKPIInsightsWidget';
+import AIProcessOptimizer from './components/AIProcessOptimizer';
+import AIInventoryManager from './components/AIInventoryManager';
+import AIWorkflowBuilder from './components/AIWorkflowBuilder';
+import AIAssistant, { AIAssistantFAB } from './components/AIAssistant';
+import AIUserManagement from './components/AIUserManagement';
+import AIDataManager from './components/ai/AIDataManager';
+import FloatingChatWidget from './components/FloatingChatWidget';
 
 const App: React.FC = () => {
   const { user, loading, logout } = useAuth();
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
 
   // Debug logging
   console.log('🔍 App render - user:', user);
@@ -36,7 +51,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <>
+    <ChatProvider>
       {user && (
         <AppBar position="static" sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
           <Toolbar>
@@ -74,6 +89,14 @@ const App: React.FC = () => {
           element={
             <PrivateRoute>
               <WorkflowBuilder />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/automated-workflow-builder"
+          element={
+            <PrivateRoute>
+              <AutomatedWorkflowBuilder />
             </PrivateRoute>
           }
         />
@@ -125,6 +148,71 @@ const App: React.FC = () => {
             </PrivateRoute>
           }
         />
+        {/* AI-Enhanced Routes */}
+        <Route
+          path="/ai-kpi-insights"
+          element={
+            <PrivateRoute>
+              <AIKPIInsightsWidget />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ai-process-optimizer"
+          element={
+            <PrivateRoute>
+              <AIProcessOptimizer />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ai-inventory-manager"
+          element={
+            <PrivateRoute>
+              <AIInventoryManager />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ai-workflow-builder"
+          element={
+            <PrivateRoute>
+              <AIWorkflowBuilder />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ai-dashboard"
+          element={
+            <PrivateRoute>
+              <AIDashboard />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ai-user-management"
+          element={
+            <PrivateRoute>
+              <AIUserManagement />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/ai-data-manager"
+          element={
+            <PrivateRoute>
+              <AIDataManager />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/team-chat"
+          element={
+            <PrivateRoute>
+              <TeamChat />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/"
           element={<Navigate to="/dashboard" />}
@@ -134,7 +222,23 @@ const App: React.FC = () => {
           element={<Navigate to="/dashboard" />}
         />
       </Routes>
-    </>
+      
+      {/* AI Assistant - Available as floating action button on all authenticated pages */}
+      {user && (
+        <AIAssistantFAB 
+          onClick={() => setAiAssistantOpen(true)}
+        />
+      )}
+      
+      {/* AI Assistant Dialog */}
+      <AIAssistant 
+        isOpen={aiAssistantOpen}
+        onClose={() => setAiAssistantOpen(false)}
+      />
+      
+      {/* Floating Chat Widget - Available on all authenticated pages */}
+      {user && <FloatingChatWidget />}
+    </ChatProvider>
   );
 };
 

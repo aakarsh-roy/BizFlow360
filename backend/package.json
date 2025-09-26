@@ -13,16 +13,20 @@
     "lint": "echo \"No linting configured\""
   },
   "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
     "@types/bull": "^3.15.9",
+    "@types/socket.io": "^3.0.1",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "ml-matrix": "^6.12.1",
     "mongoose": "^7.5.0",
     "nodemailer": "^6.9.4",
-    "socket.io": "^4.7.2"
+    "regression": "^2.0.1",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.2",

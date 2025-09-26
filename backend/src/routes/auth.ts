@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
-import { protect } from '../middleware/auth';
+import { protect, authorize } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -146,6 +146,110 @@ router.get('/me', protect, async (req: any, res) => {
       user
     });
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @desc    Get all users (admin only)
+// @route   GET /api/auth/users
+// @access  Private (Admin only)
+router.get('/users', protect, authorize('admin'), async (req: any, res) => {
+  try {
+    const users = await User.find({}).select('-password');
+    res.json({
+      success: true,
+      users
+    });
+  } catch (error: any) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @desc    Update user
+// @route   PUT /api/auth/users/:id
+// @access  Private (Admin only)
+router.put('/users/:id', protect, authorize('admin'), async (req: any, res) => {
+  try {
+    const { name, email, role, department, isActive } = req.body;
+    const userId = req.params.id;
+
+    // Find user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (email) user.email = email.trim().toLowerCase();
+    if (role) user.role = role;
+    if (department) user.department = department;
+    if (typeof isActive === 'boolean') user.isActive = isActive;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'User updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        isActive: user.isActive
+      }
+    });
+  } catch (error: any) {
+    console.error('Error updating user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @desc    Delete user
+// @route   DELETE /api/auth/users/:id
+// @access  Private (Admin only)
+router.delete('/users/:id', protect, authorize('admin'), async (req: any, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Don't allow deleting yourself
+    if (userId === req.user.id) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account'
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    await User.findByIdAndDelete(userId);
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
