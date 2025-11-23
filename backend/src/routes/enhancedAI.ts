@@ -66,15 +66,19 @@ router.get('/system-status', protect, async (req: AuthRequest, res: Response) =>
  */
 router.post('/initialize-training-data', protect, async (req: AuthRequest, res: Response) => {
   try {
-    const { companyId } = req.body;
-    
-    if (!companyId) {
+    const rawCompanyId = (req.body && (req.body as any).companyId)
+      || (req as any).user?.companyId
+      || (req as any).user?._id
+      || (req as any).user?.id;
+
+    if (!rawCompanyId) {
       return res.status(400).json({
         success: false,
-        message: 'Company ID is required'
+        message: 'Company ID is required or could not be inferred from user context'
       });
     }
 
+    const companyId = rawCompanyId.toString();
     console.log(`🚀 Initializing AI training data for company: ${companyId}`);
     
     const result = await AIDataSeeder.seedAITrainingData(companyId);
@@ -300,6 +304,25 @@ router.get('/training-stats/:companyId', protect, async (req: AuthRequest, res: 
 
   } catch (error) {
     console.error('❌ Error getting training data stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get training data statistics',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Alternate endpoint that infers companyId from authenticated user
+router.get('/training-stats', protect, async (req: AuthRequest, res: Response) => {
+  try {
+    const rawCompanyId = (req as any).user?.companyId || (req as any).user?._id || (req as any).user?.id;
+    if (!rawCompanyId) {
+      return res.status(400).json({ success: false, message: 'Company ID not found in user context' });
+    }
+    const stats = await AIDataSeeder.getDataStats(rawCompanyId.toString());
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    console.error('❌ Error getting training data stats (alt):', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get training data statistics',

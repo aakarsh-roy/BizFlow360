@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Box, AppBar, Toolbar, Typography, Button } from '@mui/material';
 
 import Login from './pages/Login';
@@ -31,6 +31,8 @@ import FloatingChatWidget from './components/FloatingChatWidget';
 const App: React.FC = () => {
   const { user, loading, logout } = useAuth();
   const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Debug logging
   console.log('🔍 App render - user:', user);
@@ -69,6 +71,16 @@ const App: React.FC = () => {
       )}
       
       <Routes>
+        {/* Route alias for opening AI Assistant as a page overlay */}
+        <Route
+          path="/ai-assistant"
+          element={
+            <PrivateRoute>
+              {/* Render AI Control Center behind the Assistant for context */}
+              <AIDashboard />
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/login"
           element={(() => {
@@ -232,8 +244,14 @@ const App: React.FC = () => {
       
       {/* AI Assistant Dialog */}
       <AIAssistant 
-        isOpen={aiAssistantOpen}
-        onClose={() => setAiAssistantOpen(false)}
+        isOpen={aiAssistantOpen || (user != null && location.pathname === '/ai-assistant')}
+        onClose={() => {
+          setAiAssistantOpen(false);
+          // If opened via route, navigate back to AI Control Center after closing
+          if (location.pathname === '/ai-assistant') {
+            navigate('/ai-dashboard', { replace: true });
+          }
+        }}
       />
       
       {/* Floating Chat Widget - Available on all authenticated pages */}

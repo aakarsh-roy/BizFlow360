@@ -35,27 +35,20 @@ const AIDataManager: React.FC = () => {
   // Get auth token
   const getAuthToken = () => localStorage.getItem('token');
   
-  // Get company ID from user data
-  const getCompanyId = () => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      const user = JSON.parse(userData);
-      return user.companyId || user._id;
-    }
-    return null;
-  };
+  // Deprecated: getting company ID from localStorage. Backend now infers from auth token.
+  const getCompanyId = () => null;
 
   // Fetch AI training statistics
   const fetchAIStats = async () => {
     try {
       const token = getAuthToken();
-      const companyId = getCompanyId();
       
-      if (!token || !companyId) {
+      if (!token) {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`/api/ai/training-stats/${companyId}`, {
+      // Use new endpoint that infers companyId from authenticated user
+      const response = await fetch(`/api/ai/training-stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -110,9 +103,8 @@ const AIDataManager: React.FC = () => {
 
     try {
       const token = getAuthToken();
-      const companyId = getCompanyId();
       
-      if (!token || !companyId) {
+      if (!token) {
         throw new Error('Authentication required');
       }
 
@@ -122,7 +114,8 @@ const AIDataManager: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ companyId })
+        // companyId no longer required; backend infers from user context
+        body: JSON.stringify({})
       });
 
       if (!response.ok) {
@@ -152,9 +145,8 @@ const AIDataManager: React.FC = () => {
 
     try {
       const token = getAuthToken();
-      const companyId = getCompanyId();
       
-      if (!token || !companyId) {
+      if (!token) {
         throw new Error('Authentication required');
       }
 
@@ -164,7 +156,8 @@ const AIDataManager: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ companyId })
+        // companyId no longer required; backend infers from user context
+        body: JSON.stringify({})
       });
 
       if (!response.ok) {
